@@ -10,7 +10,7 @@ func main() {
 	cmd := &cobra.Command{}
 
 	cmd.AddCommand(serverCommand())
-	cmd.AddCommand(clientCommand())
+	cmd.AddCommand(tcpForwardCommand())
 	cmd.AddCommand(httpProxyCommand())
 
 	if err := cmd.Execute(); err != nil {
@@ -37,7 +37,7 @@ func serverCommand() *cobra.Command {
 	return cmd
 }
 
-func clientCommand() *cobra.Command {
+func tcpForwardCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "tcp-forward",
 		SilenceUsage: true,
