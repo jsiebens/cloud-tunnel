@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/yamux"
+	"golang.org/x/oauth2/google"
 	"log/slog"
 	"net/http"
 )
 
 type HttpProxyConfig struct {
 	ServiceUrl string
+	Mux        bool
 	Instance   string
 	Port       int
 	Project    string
@@ -26,6 +28,20 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 		p := &httpProxy{
 			addr: addr,
 			dial: connectViaCloudRun(ts, c.ServiceUrl),
+		}
+
+		return p.start()
+	}
+
+	if !c.Mux {
+		ts, err := google.DefaultTokenSource(ctx)
+		if err != nil {
+			return err
+		}
+
+		p := &httpProxy{
+			addr: addr,
+			dial: connectViaIAP(ts, c.Instance, c.Port, c.Project, c.Zone),
 		}
 
 		return p.start()

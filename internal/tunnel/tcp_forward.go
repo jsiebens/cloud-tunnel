@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/yamux"
+	"golang.org/x/oauth2/google"
 	"log/slog"
 	"net"
 )
 
 type TcpForwardConfig struct {
 	ServiceUrl string
+	Mux        bool
 	Instance   string
 	Port       int
 	Project    string
@@ -28,6 +30,21 @@ func StartClient(ctx context.Context, addr string, c TcpForwardConfig) error {
 			addr:     addr,
 			upstream: c.Upstream,
 			dial:     connectViaCloudRun(ts, c.ServiceUrl),
+		}
+
+		return p.start()
+	}
+
+	if !c.Mux {
+		ts, err := google.DefaultTokenSource(ctx)
+		if err != nil {
+			return err
+		}
+
+		p := tcpForward{
+			addr:     addr,
+			upstream: c.Upstream,
+			dial:     connectViaIAP(ts, c.Instance, c.Port, c.Project, c.Zone),
 		}
 
 		return p.start()

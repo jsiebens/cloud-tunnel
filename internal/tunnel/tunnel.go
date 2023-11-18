@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cedws/iapc/iap"
 	"github.com/hashicorp/yamux"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -121,6 +122,32 @@ func connectViaCloudRun(ts oauth2.TokenSource, serviceUrl string) dialFunc {
 			return nil, err
 		}
 		return connect(http.DefaultClient, ts, u, addr)
+	}
+}
+
+func connectViaIAP(ts oauth2.TokenSource, instance string, port int, project, zone string) dialFunc {
+	return func(network, addr string) (io.ReadWriteCloser, error) {
+		u, err := url.Parse("http://localhost")
+		if err != nil {
+			return nil, err
+		}
+
+		opts := []iap.DialOption{
+			iap.WithProject(project),
+			iap.WithInstance(instance, zone, "nic0"),
+			iap.WithPort(fmt.Sprintf("%d", port)),
+			iap.WithTokenSource(&ts),
+		}
+
+		clt := &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return iap.Dial(ctx, opts...)
+				},
+			},
+		}
+
+		return connect(clt, ts, u, addr)
 	}
 }
 

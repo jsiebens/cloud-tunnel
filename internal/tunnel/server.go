@@ -8,18 +8,19 @@ import (
 	"os"
 )
 
-func StartServer(addr string) error {
-	s := &Server{}
+func StartServer(addr string, mux bool) error {
+	s := &Server{mux: mux}
 	return s.start(addr)
 }
 
 type Server struct {
+	mux bool
 }
 
 func (s *Server) start(addr string) error {
 	// if running as a Cloud Run service, don't use mux
-	if os.Getenv("K_SERVICE") != "" {
-		slog.Info(fmt.Sprintf("Listening on %s", addr))
+	if !s.mux || os.Getenv("K_SERVICE") != "" {
+		slog.Info(fmt.Sprintf("Listening on %s in standard mode", addr))
 		tunnel := &tunnelServer{}
 		return tunnel.listenAndServe(addr)
 	}
@@ -29,7 +30,7 @@ func (s *Server) start(addr string) error {
 		return err
 	}
 
-	slog.Info(fmt.Sprintf("Listening on %s", addr))
+	slog.Info(fmt.Sprintf("Listening on %s in mux mode", addr))
 
 	for {
 		conn, err := listener.Accept()
