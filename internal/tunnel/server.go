@@ -5,6 +5,7 @@ import (
 	"github.com/hashicorp/yamux"
 	"log/slog"
 	"net"
+	"os"
 )
 
 func StartServer(addr string) error {
@@ -16,6 +17,13 @@ type Server struct {
 }
 
 func (s *Server) start(addr string) error {
+	// if running as a Cloud Run service, don't use mux
+	if os.Getenv("K_SERVICE") != "" {
+		slog.Info(fmt.Sprintf("Listening on %s", addr))
+		tunnel := &tunnelServer{}
+		return tunnel.listenAndServe(addr)
+	}
+
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err

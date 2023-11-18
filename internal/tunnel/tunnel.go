@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/yamux"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/idtoken"
 	"io"
 	"log/slog"
 	"net"
@@ -14,7 +17,8 @@ import (
 )
 
 const (
-	upstreamHeaderName = "X-Cloud-Tunnel-Upstream"
+	authorizationHeaderName = "Authorization"
+	upstreamHeaderName      = "X-Cloud-Tunnel-Upstream"
 )
 
 type dialFunc func(network, addr string) (io.ReadWriteCloser, error)
@@ -25,6 +29,11 @@ type tunnelServer struct {
 func (s *tunnelServer) serve(l net.Listener) error {
 	hs := &http.Server{Handler: s}
 	return hs.Serve(l)
+}
+
+func (s *tunnelServer) listenAndServe(addr string) error {
+	server := &http.Server{Addr: addr, Handler: s}
+	return server.ListenAndServe()
 }
 
 func (s *tunnelServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -101,11 +110,57 @@ func connectViaMux(session *yamux.Session) dialFunc {
 			},
 		}
 
-		return doHijack(clt, u, addr)
+		return connect(clt, nil, u, addr)
 	}
 }
 
-func doHijack(clt *http.Client, url *url.URL, upstream string) (io.ReadWriteCloser, error) {
+func connectViaCloudRun(ts oauth2.TokenSource, serviceUrl string) dialFunc {
+	return func(network, addr string) (io.ReadWriteCloser, error) {
+		u, err := url.Parse(serviceUrl)
+		if err != nil {
+			return nil, err
+		}
+		return connect(http.DefaultClient, ts, u, addr)
+	}
+}
+
+func findTokenSource(ctx context.Context, audience string) (oauth2.TokenSource, error) {
+	tokenSource, err := idtoken.NewTokenSource(ctx, audience)
+
+	if err != nil {
+		tokenSource, err = google.DefaultTokenSource(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default token source: %w", err)
+		}
+
+		tokenSource = &idTokenFromDefaultTokenSource{ts: tokenSource}
+	}
+
+	return oauth2.ReuseTokenSource(nil, tokenSource), nil
+}
+
+type idTokenFromDefaultTokenSource struct {
+	ts oauth2.TokenSource
+}
+
+func (s *idTokenFromDefaultTokenSource) Token() (*oauth2.Token, error) {
+	token, err := s.ts.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	idToken, ok := token.Extra("id_token").(string)
+	if !ok {
+		return nil, fmt.Errorf("missing id_token")
+	}
+
+	return &oauth2.Token{
+		AccessToken: idToken,
+		Expiry:      token.Expiry,
+	}, nil
+}
+
+func connect(clt *http.Client, ts oauth2.TokenSource, url *url.URL, upstream string) (io.ReadWriteCloser, error) {
 	req := &http.Request{
 		Method: "GET",
 		URL:    url,
@@ -114,6 +169,14 @@ func doHijack(clt *http.Client, url *url.URL, upstream string) (io.ReadWriteClos
 			"Connection":       []string{"upgrade"},
 			upstreamHeaderName: []string{upstream},
 		},
+	}
+
+	if ts != nil {
+		token, err := ts.Token()
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set(authorizationHeaderName, "Bearer "+token.AccessToken)
 	}
 
 	resp, err := clt.Do(req)

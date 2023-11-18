@@ -9,13 +9,28 @@ import (
 )
 
 type HttpProxyConfig struct {
-	Instance string
-	Port     int
-	Project  string
-	Zone     string
+	ServiceUrl string
+	Instance   string
+	Port       int
+	Project    string
+	Zone       string
 }
 
 func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
+	if c.ServiceUrl != "" {
+		ts, err := findTokenSource(ctx, c.ServiceUrl)
+		if err != nil {
+			return err
+		}
+
+		p := &httpProxy{
+			addr: addr,
+			dial: connectViaCloudRun(ts, c.ServiceUrl),
+		}
+
+		return p.start()
+	}
+
 	conn, err := dial(ctx, c.Instance, c.Port, c.Project, c.Zone)
 	if err != nil {
 		return err

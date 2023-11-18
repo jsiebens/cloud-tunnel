@@ -9,14 +9,30 @@ import (
 )
 
 type TcpForwardConfig struct {
-	Instance string
-	Port     int
-	Project  string
-	Zone     string
-	Upstream string
+	ServiceUrl string
+	Instance   string
+	Port       int
+	Project    string
+	Zone       string
+	Upstream   string
 }
 
 func StartClient(ctx context.Context, addr string, c TcpForwardConfig) error {
+	if c.ServiceUrl != "" {
+		ts, err := findTokenSource(ctx, c.ServiceUrl)
+		if err != nil {
+			return err
+		}
+
+		p := tcpForward{
+			addr:     addr,
+			upstream: c.Upstream,
+			dial:     connectViaCloudRun(ts, c.ServiceUrl),
+		}
+
+		return p.start()
+	}
+
 	conn, err := dial(ctx, c.Instance, c.Port, c.Project, c.Zone)
 	if err != nil {
 		return err

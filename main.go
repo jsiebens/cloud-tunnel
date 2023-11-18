@@ -46,6 +46,7 @@ func clientCommand() *cobra.Command {
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", "127.0.0.1:8080", "")
 	cmd.Flags().StringVarP(&c.Upstream, "upstream", "", "", "")
+	cmd.Flags().StringVarP(&c.ServiceUrl, "service-url", "", "", "")
 	cmd.Flags().StringVarP(&c.Instance, "instance", "", "", "")
 	cmd.Flags().IntVarP(&c.Port, "port", "", 7654, "")
 	cmd.Flags().StringVarP(&c.Project, "project", "", "", "")
@@ -68,6 +69,7 @@ func httpProxyCommand() *cobra.Command {
 	var c = tunnel.HttpProxyConfig{}
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", "127.0.0.1:8080", "")
+	cmd.Flags().StringVarP(&c.ServiceUrl, "service-url", "", "", "")
 	cmd.Flags().StringVarP(&c.Instance, "instance", "", "", "")
 	cmd.Flags().IntVarP(&c.Port, "port", "", 7654, "")
 	cmd.Flags().StringVarP(&c.Project, "project", "", "", "")
