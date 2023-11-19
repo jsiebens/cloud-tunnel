@@ -18,6 +18,7 @@ import (
 )
 
 const (
+	DefaultServerPort       = 7654
 	authorizationHeaderName = "Authorization"
 	upstreamHeaderName      = "X-Cloud-Tunnel-Upstream"
 )
@@ -126,6 +127,10 @@ func connectViaCloudRun(ts oauth2.TokenSource, serviceUrl string) dialFunc {
 }
 
 func connectViaIAP(ts oauth2.TokenSource, instance string, port int, project, zone string) dialFunc {
+	if port == 0 {
+		port = DefaultServerPort
+	}
+
 	return func(network, addr string) (io.ReadWriteCloser, error) {
 		u, err := url.Parse("http://localhost")
 		if err != nil {
