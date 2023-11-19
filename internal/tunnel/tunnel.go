@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cedws/iapc/iap"
-	"github.com/hashicorp/yamux"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/idtoken"
@@ -95,25 +94,6 @@ func (s *tunnelServer) handleConnection(conn net.Conn, target string) {
 	slog.Info("Dialed upstream", "addr", target)
 	defer dst.Close()
 	pipe(conn, dst)
-}
-
-func connectViaMux(session *yamux.Session) dialFunc {
-	return func(network, addr string) (io.ReadWriteCloser, error) {
-		u, err := url.Parse("http://localhost")
-		if err != nil {
-			return nil, err
-		}
-
-		clt := &http.Client{
-			Transport: &http.Transport{
-				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-					return session.Open()
-				},
-			},
-		}
-
-		return connect(clt, nil, u, addr)
-	}
 }
 
 func connectViaCloudRun(ts oauth2.TokenSource, serviceUrl string) dialFunc {
