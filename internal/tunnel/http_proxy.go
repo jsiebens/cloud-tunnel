@@ -3,7 +3,6 @@ package tunnel
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/yamux"
 	"golang.org/x/oauth2/google"
 	"log/slog"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 
 type HttpProxyConfig struct {
 	ServiceUrl string
-	Mux        bool
 	Instance   string
 	Port       int
 	Project    string
@@ -19,6 +17,7 @@ type HttpProxyConfig struct {
 }
 
 func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
+	// cloud run
 	if c.ServiceUrl != "" {
 		ts, err := findTokenSource(ctx, c.ServiceUrl)
 		if err != nil {
@@ -33,7 +32,8 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 		return p.start()
 	}
 
-	if !c.Mux {
+	// iap
+	{
 		ts, err := google.DefaultTokenSource(ctx)
 		if err != nil {
 			return err
@@ -46,28 +46,6 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 
 		return p.start()
 	}
-
-	conn, err := dial(ctx, c.Instance, c.Port, c.Project, c.Zone)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	session, err := yamux.Client(conn, nil)
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	p := &httpProxy{
-		addr: addr,
-		dial: connectViaMux(session),
-	}
-
-	go p.start()
-
-	<-session.CloseChan()
-	return fmt.Errorf("session closed")
 }
 
 type httpProxy struct {

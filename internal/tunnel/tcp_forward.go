@@ -3,7 +3,6 @@ package tunnel
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/yamux"
 	"golang.org/x/oauth2/google"
 	"log/slog"
 	"net"
@@ -11,7 +10,6 @@ import (
 
 type TcpForwardConfig struct {
 	ServiceUrl string
-	Mux        bool
 	Instance   string
 	Port       int
 	Project    string
@@ -20,6 +18,7 @@ type TcpForwardConfig struct {
 }
 
 func StartClient(ctx context.Context, addr string, c TcpForwardConfig) error {
+	// cloud run
 	if c.ServiceUrl != "" {
 		ts, err := findTokenSource(ctx, c.ServiceUrl)
 		if err != nil {
@@ -35,7 +34,8 @@ func StartClient(ctx context.Context, addr string, c TcpForwardConfig) error {
 		return p.start()
 	}
 
-	if !c.Mux {
+	// iap
+	{
 		ts, err := google.DefaultTokenSource(ctx)
 		if err != nil {
 			return err
@@ -49,29 +49,6 @@ func StartClient(ctx context.Context, addr string, c TcpForwardConfig) error {
 
 		return p.start()
 	}
-
-	conn, err := dial(ctx, c.Instance, c.Port, c.Project, c.Zone)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	session, err := yamux.Client(conn, nil)
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	p := tcpForward{
-		addr:     addr,
-		upstream: c.Upstream,
-		dial:     connectViaMux(session),
-	}
-
-	go p.start()
-
-	<-session.CloseChan()
-	return fmt.Errorf("session closed")
 }
 
 type tcpForward struct {

@@ -25,13 +25,11 @@ func serverCommand() *cobra.Command {
 	}
 
 	var addr string
-	var mux bool
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", ":7654", "")
-	cmd.Flags().BoolVarP(&mux, "mux", "", false, "")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		return tunnel.StartServer(addr, mux)
+		return tunnel.StartServer(addr)
 	}
 
 	return cmd
@@ -49,7 +47,6 @@ func tcpForwardCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", "127.0.0.1:8080", "")
 	cmd.Flags().StringVarP(&c.Upstream, "upstream", "", "", "")
 	cmd.Flags().StringVarP(&c.ServiceUrl, "service-url", "", "", "")
-	cmd.Flags().BoolVarP(&c.Mux, "mux", "", false, "")
 	cmd.Flags().StringVarP(&c.Instance, "instance", "", "", "")
 	cmd.Flags().IntVarP(&c.Port, "port", "", 7654, "")
 	cmd.Flags().StringVarP(&c.Project, "project", "", "", "")
@@ -73,7 +70,6 @@ func httpProxyCommand() *cobra.Command {
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", "127.0.0.1:8080", "")
 	cmd.Flags().StringVarP(&c.ServiceUrl, "service-url", "", "", "")
-	cmd.Flags().BoolVarP(&c.Mux, "mux", "", false, "")
 	cmd.Flags().StringVarP(&c.Instance, "instance", "", "", "")
 	cmd.Flags().IntVarP(&c.Port, "port", "", 7654, "")
 	cmd.Flags().StringVarP(&c.Project, "project", "", "", "")
