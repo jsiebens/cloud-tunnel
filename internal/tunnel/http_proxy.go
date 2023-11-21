@@ -13,7 +13,8 @@ import (
 )
 
 type HttpProxyConfig struct {
-	Rules []Rule `yaml:"rules"`
+	Rules   []Rule        `yaml:"rules"`
+	Timeout time.Duration `yaml:"dial_timeout"`
 }
 
 type Rule struct {
@@ -78,6 +79,11 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 	p := &httpProxy{
 		addr:    addr,
 		targets: targets,
+		timeout: c.Timeout,
+	}
+
+	if p.timeout == 0 {
+		p.timeout = DefaultTimeout
 	}
 
 	return p.start()
@@ -85,6 +91,7 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 
 type httpProxy struct {
 	addr    string
+	timeout time.Duration
 	targets []proxyTarget
 }
 
@@ -142,7 +149,7 @@ func (hp *httpProxy) getDialer(target string) (string, dialFunc) {
 	}
 
 	return "local", func(network, addr string) (io.ReadWriteCloser, error) {
-		return net.DialTimeout(network, addr, time.Second*5)
+		return net.DialTimeout(network, addr, hp.timeout)
 	}
 }
 

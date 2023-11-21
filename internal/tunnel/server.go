@@ -3,18 +3,11 @@ package tunnel
 import (
 	"fmt"
 	"log/slog"
+	"time"
 )
 
-func StartServer(addr string) error {
-	s := &Server{}
-	return s.start(addr)
-}
-
-type Server struct {
-}
-
-func (s *Server) start(addr string) error {
+func StartServer(addr string, timeout time.Duration) error {
 	slog.Info(fmt.Sprintf("Listening on %s", addr))
-	tunnel := &tunnelServer{}
+	tunnel := &tunnelServer{timeout: timeout}
 	return tunnel.listenAndServe(addr)
 }

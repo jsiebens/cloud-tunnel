@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	DefaultTimeout          = 5 * time.Second
 	DefaultServerPort       = 7654
 	authorizationHeaderName = "Authorization"
 	upstreamHeaderName      = "X-Cloud-Tunnel-Upstream"
@@ -25,6 +26,7 @@ const (
 type dialFunc func(network, addr string) (io.ReadWriteCloser, error)
 
 type tunnelServer struct {
+	timeout time.Duration
 }
 
 func (s *tunnelServer) serve(l net.Listener) error {
@@ -86,7 +88,7 @@ func (s *tunnelServer) hijackConnection(w http.ResponseWriter, r *http.Request) 
 
 func (s *tunnelServer) handleConnection(conn net.Conn, target string) {
 	defer conn.Close()
-	dst, err := net.DialTimeout("tcp", target, 10*time.Second)
+	dst, err := net.DialTimeout("tcp", target, s.timeout)
 	if err != nil {
 		slog.Error("Unable to dial upstream", "addr", target, "err", err)
 		return

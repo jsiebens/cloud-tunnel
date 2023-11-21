@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	"os"
+	"time"
 )
 
 func main() {
@@ -26,11 +27,13 @@ func serverCommand() *cobra.Command {
 	}
 
 	var addr string
+	var timeout time.Duration
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", ":7654", "")
+	cmd.Flags().DurationVarP(&timeout, "dial-timeout", "", tunnel.DefaultTimeout, "")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		return tunnel.StartServer(addr)
+		return tunnel.StartServer(addr, timeout)
 	}
 
 	return cmd
@@ -43,6 +46,7 @@ func tcpForwardCommand() *cobra.Command {
 	}
 
 	var addr string
+	var timeout time.Duration
 	var c = tunnel.TcpForwardConfig{}
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", "127.0.0.1:8080", "")
@@ -52,6 +56,7 @@ func tcpForwardCommand() *cobra.Command {
 	cmd.Flags().IntVarP(&c.Port, "port", "", tunnel.DefaultServerPort, "")
 	cmd.Flags().StringVarP(&c.Project, "project", "", "", "")
 	cmd.Flags().StringVarP(&c.Zone, "zone", "", "", "")
+	cmd.Flags().DurationVarP(&timeout, "dial-timeout", "", tunnel.DefaultTimeout, "")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		return tunnel.StartClient(cmd.Context(), addr, c)
