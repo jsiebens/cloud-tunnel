@@ -6,6 +6,7 @@ import (
 	"golang.org/x/oauth2/google"
 	"log/slog"
 	"net"
+	"net/url"
 )
 
 type TcpForwardConfig struct {
@@ -20,6 +21,11 @@ type TcpForwardConfig struct {
 func StartClient(ctx context.Context, addr string, c TcpForwardConfig) error {
 	// cloud run
 	if c.ServiceUrl != "" {
+		u, err := url.Parse(c.ServiceUrl)
+		if err != nil {
+			return err
+		}
+
 		ts, err := findTokenSource(ctx, c.ServiceUrl)
 		if err != nil {
 			return err
@@ -28,7 +34,7 @@ func StartClient(ctx context.Context, addr string, c TcpForwardConfig) error {
 		p := tcpForward{
 			addr:     addr,
 			upstream: c.Upstream,
-			dial:     connectViaCloudRun(ts, c.ServiceUrl),
+			dialer:   NewCloudRunRemoteDialer(ts, u),
 		}
 
 		return p.start()
@@ -44,7 +50,7 @@ func StartClient(ctx context.Context, addr string, c TcpForwardConfig) error {
 		p := tcpForward{
 			addr:     addr,
 			upstream: c.Upstream,
-			dial:     connectViaIAP(ts, c.Instance, c.Port, c.Project, c.Zone),
+			dialer:   NewIAPRemoteDialer(ts, c.Instance, c.Port, c.Project, c.Zone),
 		}
 
 		return p.start()
@@ -54,7 +60,7 @@ func StartClient(ctx context.Context, addr string, c TcpForwardConfig) error {
 type tcpForward struct {
 	addr     string
 	upstream string
-	dial     dialFunc
+	dialer   Dialer
 }
 
 func (tp *tcpForward) start() error {
@@ -77,7 +83,7 @@ func (tp *tcpForward) start() error {
 
 func (tp *tcpForward) handleConnection(conn net.Conn) {
 	defer conn.Close()
-	dst, err := tp.dial("tcp", tp.upstream)
+	dst, err := tp.dialer.Dial("tcp", tp.upstream)
 	if err != nil {
 		slog.Error("Unable to dial upstream", "addr", tp.upstream, "err", err)
 		return

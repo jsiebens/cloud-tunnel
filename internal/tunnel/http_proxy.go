@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"golang.org/x/oauth2/google"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"time"
 )
 
@@ -36,6 +36,11 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 	for _, rule := range c.Rules {
 		t := rule.Tunnel
 		if t.ServiceUrl != "" {
+			u, err := url.Parse(t.ServiceUrl)
+			if err != nil {
+				return err
+			}
+
 			ts, err := findTokenSource(ctx, t.ServiceUrl)
 			if err != nil {
 				return err
@@ -44,7 +49,7 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 			for _, upstream := range rule.Upstreams {
 				u := proxyTarget{
 					upstream: upstream,
-					dial:     connectViaCloudRun(ts, t.ServiceUrl),
+					dialer:   NewCloudRunRemoteDialer(ts, u),
 				}
 
 				if prefix, err := netip.ParsePrefix(upstream); err == nil {
@@ -64,7 +69,7 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 			for _, upstream := range rule.Upstreams {
 				u := proxyTarget{
 					upstream: upstream,
-					dial:     connectViaIAP(ts, t.Instance, t.Port, t.Project, t.Zone),
+					dialer:   NewIAPRemoteDialer(ts, t.Instance, t.Port, t.Project, t.Zone),
 				}
 
 				if prefix, err := netip.ParsePrefix(upstream); err == nil {
@@ -79,11 +84,7 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 	p := &httpProxy{
 		addr:    addr,
 		targets: targets,
-		timeout: c.Timeout,
-	}
-
-	if p.timeout == 0 {
-		p.timeout = DefaultTimeout
+		dialer:  NewDefaultDialer(c.Timeout),
 	}
 
 	return p.start()
@@ -91,7 +92,7 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 
 type httpProxy struct {
 	addr    string
-	timeout time.Duration
+	dialer  Dialer
 	targets []proxyTarget
 }
 
@@ -112,9 +113,9 @@ func (hp *httpProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (hp *httpProxy) connect(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
-	mode, dial := hp.getDialer(req.Host)
+	mode, dialer := hp.getDialer(req.Host)
 
-	conn, err := dial("tcp", req.Host)
+	conn, err := dialer.Dial("tcp", req.Host)
 	if err != nil {
 		slog.Error("Error dialing upstream", "addr", req.Host, "err", err)
 		http.Error(w, fmt.Sprintf("Unable to dial %s, error: %s", req.Host, err.Error()), http.StatusServiceUnavailable)
@@ -141,22 +142,20 @@ func (hp *httpProxy) connect(w http.ResponseWriter, req *http.Request) {
 	pipe(conn, reqConn)
 }
 
-func (hp *httpProxy) getDialer(target string) (string, dialFunc) {
+func (hp *httpProxy) getDialer(target string) (string, Dialer) {
 	for _, u := range hp.targets {
 		if u.matches(target) {
-			return "remote", u.dial
+			return "remote", u.dialer
 		}
 	}
 
-	return "local", func(network, addr string) (io.ReadWriteCloser, error) {
-		return net.DialTimeout(network, addr, hp.timeout)
-	}
+	return "local", hp.dialer
 }
 
 type proxyTarget struct {
 	upstream string
 	prefix   *netip.Prefix
-	dial     dialFunc
+	dialer   Dialer
 }
 
 func (u proxyTarget) matches(candidate string) bool {
