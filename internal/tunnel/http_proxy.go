@@ -46,17 +46,29 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 				return err
 			}
 
+			dialer := NewCloudRunRemoteDialer(ts, u)
+
+			if len(rule.Upstreams) == 0 {
+				pt := proxyTarget{
+					upstream: "*",
+					dialer:   dialer,
+				}
+
+				targets = append(targets, pt)
+				continue
+			}
+
 			for _, upstream := range rule.Upstreams {
-				u := proxyTarget{
+				pt := proxyTarget{
 					upstream: upstream,
-					dialer:   NewCloudRunRemoteDialer(ts, u),
+					dialer:   dialer,
 				}
 
 				if prefix, err := netip.ParsePrefix(upstream); err == nil {
-					u.prefix = &prefix
+					pt.prefix = &prefix
 				}
 
-				targets = append(targets, u)
+				targets = append(targets, pt)
 			}
 		}
 
@@ -66,10 +78,22 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 				return err
 			}
 
+			dialer := NewIAPRemoteDialer(ts, t.Instance, t.Port, t.Project, t.Zone)
+
+			if len(rule.Upstreams) == 0 {
+				pt := proxyTarget{
+					upstream: "*",
+					dialer:   dialer,
+				}
+
+				targets = append(targets, pt)
+				continue
+			}
+
 			for _, upstream := range rule.Upstreams {
 				u := proxyTarget{
 					upstream: upstream,
-					dialer:   NewIAPRemoteDialer(ts, t.Instance, t.Port, t.Project, t.Zone),
+					dialer:   dialer,
 				}
 
 				if prefix, err := netip.ParsePrefix(upstream); err == nil {
@@ -159,6 +183,10 @@ type proxyTarget struct {
 }
 
 func (u proxyTarget) matches(candidate string) bool {
+	if u.upstream == "*" {
+		return true
+	}
+
 	if candidate == u.upstream {
 		return true
 	}
