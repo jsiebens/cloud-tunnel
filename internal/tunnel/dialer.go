@@ -3,6 +3,7 @@ package tunnel
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/yamux"
 	"github.com/jsiebens/cloud-tunnel/internal/iap"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -11,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -43,12 +45,14 @@ func NewDefaultDialer(timeout time.Duration) Dialer {
 	return &DefaultDialer{timeout}
 }
 
+func NewCloudRunRemoteDialer(ts oauth2.TokenSource, url *url.URL) Dialer {
+	return &RemoteDialer{url, ts, http.DefaultClient}
+}
+
 func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, project, zone string) Dialer {
 	if port == 0 {
 		port = DefaultServerPort
 	}
-
-	u, _ := url.Parse("http://localhost")
 
 	opts := iap.DialOptions{
 		Project:  project,
@@ -57,10 +61,23 @@ func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, projec
 		Port:     port,
 	}
 
+	c := func(ctx context.Context) (io.ReadWriteCloser, error) {
+		dial, err := iap.Dial(ctx, ts, opts)
+		return dial, err
+	}
+
+	ms := &muxedSession{connect: c}
+
+	u, _ := url.Parse("http://localhost")
+
 	clt := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return iap.Dial(ctx, ts, opts)
+				session, err := ms.getSession(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return session.Open()
 			},
 		},
 	}
@@ -68,8 +85,38 @@ func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, projec
 	return &RemoteDialer{u, ts, clt}
 }
 
-func NewCloudRunRemoteDialer(ts oauth2.TokenSource, url *url.URL) Dialer {
-	return &RemoteDialer{url, ts, http.DefaultClient}
+type muxedSession struct {
+	sync.RWMutex
+
+	connect func(context.Context) (io.ReadWriteCloser, error)
+	session *yamux.Session
+}
+
+func (m *muxedSession) getSession(ctx context.Context) (*yamux.Session, error) {
+	m.RLock()
+	if m.session != nil && !m.session.IsClosed() {
+		m.RUnlock()
+		return m.session, nil
+	}
+	m.RUnlock()
+
+	m.Lock()
+	defer m.Unlock()
+
+	if m.session != nil && !m.session.IsClosed() {
+		return m.session, nil
+	}
+
+	conn, err := m.connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if m.session, err = yamux.Client(conn, nil); err != nil {
+		return nil, err
+	}
+
+	return m.session, nil
 }
 
 func findTokenSource(ctx context.Context, audience string) (oauth2.TokenSource, error) {

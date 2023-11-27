@@ -3,6 +3,7 @@ module github.com/jsiebens/cloud-tunnel
 go 1.21
 
 require (
+	github.com/hashicorp/yamux v0.1.1
 	github.com/spf13/cobra v1.8.0
 	golang.org/x/oauth2 v0.14.0
 	google.golang.org/api v0.151.0
