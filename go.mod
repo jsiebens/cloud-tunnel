@@ -3,11 +3,11 @@ module github.com/jsiebens/cloud-tunnel
 go 1.21
 
 require (
-	github.com/cedws/iapc v0.1.7-0.20231105234435-e97c18375cb3
 	github.com/spf13/cobra v1.8.0
 	golang.org/x/oauth2 v0.14.0
 	google.golang.org/api v0.151.0
 	gopkg.in/yaml.v3 v3.0.1
+	nhooyr.io/websocket v1.8.10
 )
 
 require (
@@ -28,5 +28,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231106174013-bbf56f31fb17 // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
-	nhooyr.io/websocket v1.8.10 // indirect
 )

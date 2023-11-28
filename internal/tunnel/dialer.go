@@ -3,7 +3,7 @@ package tunnel
 import (
 	"context"
 	"fmt"
-	"github.com/cedws/iapc/iap"
+	"github.com/jsiebens/cloud-tunnel/internal/iap"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/idtoken"
@@ -50,17 +50,17 @@ func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, projec
 
 	u, _ := url.Parse("http://localhost")
 
-	opts := []iap.DialOption{
-		iap.WithProject(project),
-		iap.WithInstance(instance, zone, "nic0"),
-		iap.WithPort(fmt.Sprintf("%d", port)),
-		iap.WithTokenSource(&ts),
+	opts := iap.DialOptions{
+		Project:  project,
+		Zone:     zone,
+		Instance: instance,
+		Port:     port,
 	}
 
 	clt := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return iap.Dial(ctx, opts...)
+				return iap.Dial(ctx, ts, opts)
 			},
 		},
 	}
