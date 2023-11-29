@@ -17,7 +17,7 @@ builds:
       - goos: windows
         goarch: arm64
     ldflags:
-      - -s -w
+      - -s -w -X github.com/jsiebens/{{ .ProjectName }}/internal/version.Version={{.Version}} -X github.com/jsiebens/{{ .ProjectName }}/internal/version.Revision={{.ShortCommit}}
 
 checksum:
   name_template: "checksums.txt"

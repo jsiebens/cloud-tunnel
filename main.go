@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"github.com/jsiebens/cloud-tunnel/internal/tunnel"
+	"github.com/jsiebens/cloud-tunnel/internal/version"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -11,6 +13,7 @@ import (
 func main() {
 	cmd := &cobra.Command{}
 
+	cmd.AddCommand(versionCommand())
 	cmd.AddCommand(serverCommand())
 	cmd.AddCommand(tcpForwardCommand())
 	cmd.AddCommand(httpProxyCommand())
@@ -102,6 +105,20 @@ func httpProxyCommand() *cobra.Command {
 		}
 
 		return tunnel.StartHttpProxy(cmd.Context(), addr, config)
+	}
+
+	return cmd
+}
+
+func versionCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "version",
+		Short:        "Display version information",
+		SilenceUsage: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			clientVersion, clientRevision := version.GetReleaseInfo()
+			fmt.Printf("Version:   %s\nRevision:  %s\n", clientVersion, clientRevision)
+		},
 	}
 
 	return cmd
