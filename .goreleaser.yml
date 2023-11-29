@@ -19,28 +19,15 @@ builds:
     ldflags:
       - -s -w
 
-dockers:
-  - image_templates: [ "ghcr.io/jsiebens/{{ .ProjectName }}:{{ .Version }}-amd64" ]
-    dockerfile: Dockerfile
-    use: buildx
-    build_flag_templates:
-      - --platform=linux/amd64
-  - image_templates: [ "ghcr.io/jsiebens/{{ .ProjectName }}:{{ .Version }}-arm64" ]
-    goarch: arm64
-    dockerfile: Dockerfile
-    use: buildx
-    build_flag_templates:
-      - --platform=linux/arm64
+checksum:
+  name_template: "checksums.txt"
 
-docker_manifests:
-  - name_template: ghcr.io/jsiebens/{{ .ProjectName }}:{{ .Version }}
-    image_templates:
-      - ghcr.io/jsiebens/{{ .ProjectName }}:{{ .Version }}-amd64
-      - ghcr.io/jsiebens/{{ .ProjectName }}:{{ .Version }}-arm64
-  - name_template: ghcr.io/jsiebens/{{ .ProjectName }}:latest
-    image_templates:
-      - ghcr.io/jsiebens/{{ .ProjectName }}:{{ .Version }}-amd64
-      - ghcr.io/jsiebens/{{ .ProjectName }}:{{ .Version }}-arm64
+dockers:
+  - image_templates:
+      - "jsiebens/{{ .ProjectName }}:latest"
+      - "jsiebens/{{ .ProjectName }}:{{ .Version }}"
+      - "ghcr.io/jsiebens/{{ .ProjectName }}:latest"
+      - "ghcr.io/jsiebens/{{ .ProjectName }}:{{ .Version }}"
 
 signs:
   - cmd: cosign
@@ -67,9 +54,11 @@ docker_signs:
       - '--yes'
 
 archives:
-  - format_overrides:
-      - goos: windows
-        format: zip
+  - format: binary
+    name_template: '{{ .Binary }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}'
+
+release:
+  prerelease: auto
 
 changelog:
   sort: asc
