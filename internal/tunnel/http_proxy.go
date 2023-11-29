@@ -31,7 +31,7 @@ type TunnelConfig struct {
 }
 
 func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
-	var targets []proxyTarget
+	var targets []proxyUpstream
 
 	for _, rule := range c.Rules {
 		t := rule.Tunnel
@@ -49,26 +49,12 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 			dialer := NewCloudRunRemoteDialer(ts, u)
 
 			if len(rule.Upstreams) == 0 {
-				pt := proxyTarget{
-					upstream: "*",
-					dialer:   dialer,
-				}
-
-				targets = append(targets, pt)
+				targets = append(targets, NewProxyUpstream("*", dialer))
 				continue
 			}
 
 			for _, upstream := range rule.Upstreams {
-				pt := proxyTarget{
-					upstream: upstream,
-					dialer:   dialer,
-				}
-
-				if prefix, err := netip.ParsePrefix(upstream); err == nil {
-					pt.prefix = &prefix
-				}
-
-				targets = append(targets, pt)
+				targets = append(targets, NewProxyUpstream(upstream, dialer))
 			}
 		}
 
@@ -81,26 +67,12 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 			dialer := NewIAPRemoteDialer(ts, t.Instance, t.Port, t.Project, t.Zone)
 
 			if len(rule.Upstreams) == 0 {
-				pt := proxyTarget{
-					upstream: "*",
-					dialer:   dialer,
-				}
-
-				targets = append(targets, pt)
+				targets = append(targets, NewProxyUpstream("*", dialer))
 				continue
 			}
 
 			for _, upstream := range rule.Upstreams {
-				u := proxyTarget{
-					upstream: upstream,
-					dialer:   dialer,
-				}
-
-				if prefix, err := netip.ParsePrefix(upstream); err == nil {
-					u.prefix = &prefix
-				}
-
-				targets = append(targets, u)
+				targets = append(targets, NewProxyUpstream(upstream, dialer))
 			}
 		}
 	}
@@ -117,7 +89,7 @@ func StartHttpProxy(ctx context.Context, addr string, c HttpProxyConfig) error {
 type httpProxy struct {
 	addr    string
 	dialer  Dialer
-	targets []proxyTarget
+	targets []proxyUpstream
 }
 
 func (hp *httpProxy) start() error {
@@ -176,13 +148,26 @@ func (hp *httpProxy) getDialer(target string) (string, Dialer) {
 	return "local", hp.dialer
 }
 
-type proxyTarget struct {
+func NewProxyUpstream(upstream string, dialer Dialer) proxyUpstream {
+	pt := proxyUpstream{
+		upstream: upstream,
+		dialer:   dialer,
+	}
+
+	if prefix, err := netip.ParsePrefix(upstream); err == nil {
+		pt.prefix = &prefix
+	}
+
+	return pt
+}
+
+type proxyUpstream struct {
 	upstream string
 	prefix   *netip.Prefix
 	dialer   Dialer
 }
 
-func (u proxyTarget) matches(candidate string) bool {
+func (u proxyUpstream) matches(candidate string) bool {
 	if u.upstream == "*" {
 		return true
 	}

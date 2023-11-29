@@ -31,12 +31,14 @@ func serverCommand() *cobra.Command {
 
 	var addr string
 	var timeout time.Duration
+	var allowedUpstreams []string
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", ":7654", "")
 	cmd.Flags().DurationVarP(&timeout, "dial-timeout", "", tunnel.DefaultTimeout, "")
+	cmd.Flags().StringSliceVarP(&allowedUpstreams, "allowed-upstream", "", []string{}, "")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		return tunnel.StartServer(addr, timeout)
+		return tunnel.StartServer(addr, timeout, allowedUpstreams)
 	}
 
 	return cmd
