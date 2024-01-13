@@ -3,6 +3,7 @@ package tunnel
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/yamux"
 	"github.com/jsiebens/cloud-tunnel/internal/iap"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -11,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -53,10 +55,20 @@ func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, projec
 		Port:     port,
 	}
 
+	c := func(ctx context.Context) (io.ReadWriteCloser, error) {
+		return iap.Dial(ctx, ts, opts)
+	}
+
+	ms := &muxedSession{connect: c}
+
 	clt := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return iap.Dial(ctx, ts, opts)
+				session, err := ms.getSession(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return session.Open()
 			},
 		},
 	}
@@ -66,6 +78,40 @@ func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, projec
 
 func NewCloudRunRemoteDialer(ts oauth2.TokenSource, url *url.URL) Dialer {
 	return &RemoteDialer{url, ts, http.DefaultClient}
+}
+
+type muxedSession struct {
+	sync.RWMutex
+
+	connect func(context.Context) (io.ReadWriteCloser, error)
+	session *yamux.Session
+}
+
+func (m *muxedSession) getSession(ctx context.Context) (*yamux.Session, error) {
+	m.RLock()
+	if m.session != nil && !m.session.IsClosed() {
+		m.RUnlock()
+		return m.session, nil
+	}
+	m.RUnlock()
+
+	m.Lock()
+	defer m.Unlock()
+
+	if m.session != nil && !m.session.IsClosed() {
+		return m.session, nil
+	}
+
+	conn, err := m.connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if m.session, err = yamux.Client(conn, nil); err != nil {
+		return nil, err
+	}
+
+	return m.session, nil
 }
 
 func findTokenSource(ctx context.Context, audience string) (oauth2.TokenSource, error) {
