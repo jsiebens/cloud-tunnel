@@ -11,29 +11,22 @@ import (
 	"time"
 )
 
-const (
-	DefaultTimeout          = 5 * time.Second
-	DefaultServerPort       = 7654
-	authorizationHeaderName = "Authorization"
-	upstreamHeaderName      = "X-Cloud-Tunnel-Upstream"
-)
-
 func StartServer(addr string, timeout time.Duration, allowedUpstreams []string) error {
 	slog.Info(fmt.Sprintf("Listening on %s", addr))
-	tunnel := NewTunnelServer(timeout, allowedUpstreams)
+	tunnel := newTunnelServer(timeout, allowedUpstreams)
 	return tunnel.listenAndServe(addr)
 }
 
-func NewTunnelServer(timeout time.Duration, allowedUpstreams []string) *tunnelServer {
+func newTunnelServer(timeout time.Duration, allowedUpstreams []string) *tunnelServer {
 	dialer := NewDefaultDialer(timeout)
 
 	if len(allowedUpstreams) == 0 {
-		return &tunnelServer{allowedUpstreams: []proxyUpstream{NewProxyUpstream("*", dialer)}}
+		return &tunnelServer{allowedUpstreams: []proxyUpstream{newProxyUpstream("*", dialer)}}
 	}
 
 	var upstreams []proxyUpstream
 	for _, u := range allowedUpstreams {
-		upstreams = append(upstreams, NewProxyUpstream(u, dialer))
+		upstreams = append(upstreams, newProxyUpstream(u, dialer))
 	}
 
 	return &tunnelServer{allowedUpstreams: upstreams}
@@ -49,7 +42,7 @@ func (s *tunnelServer) listenAndServe(addr string) error {
 }
 
 func (s *tunnelServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	target := req.Header.Get(upstreamHeaderName)
+	target := req.Header.Get(UpstreamHeaderName)
 	if len(target) == 0 {
 		http.Error(w, "missing target header", http.StatusBadRequest)
 		return
@@ -104,7 +97,7 @@ func (s *tunnelServer) hijackConnection(w http.ResponseWriter, r *http.Request) 
 
 func (s *tunnelServer) handleConnection(conn net.Conn, target string, dialer Dialer) {
 	defer conn.Close()
-	dst, err := dialer.Dial("tcp", target)
+	dst, err := dialer.DialContext(context.Background(), "tcp", target)
 	if err != nil {
 		slog.Error("Unable to dial upstream", "addr", target, "err", err)
 		return

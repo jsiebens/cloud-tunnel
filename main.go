@@ -16,7 +16,7 @@ func main() {
 	cmd.AddCommand(versionCommand())
 	cmd.AddCommand(serverCommand())
 	cmd.AddCommand(tcpForwardCommand())
-	cmd.AddCommand(httpProxyCommand())
+	cmd.AddCommand(proxyCommand())
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
@@ -64,22 +64,22 @@ func tcpForwardCommand() *cobra.Command {
 	cmd.Flags().DurationVarP(&timeout, "dial-timeout", "", tunnel.DefaultTimeout, "")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		return tunnel.StartClient(cmd.Context(), addr, c)
+		return tunnel.StartTcpForward(cmd.Context(), addr, c)
 	}
 
 	return cmd
 }
 
-func httpProxyCommand() *cobra.Command {
+func proxyCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:          "http-proxy",
+		Use:          "proxy",
 		SilenceUsage: true,
 	}
 
 	var (
 		addr       string
 		configFile string
-		rule       = tunnel.Rule{Tunnel: tunnel.TunnelConfig{}}
+		rule       = tunnel.Rule{Tunnel: tunnel.Tunnel{}}
 	)
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", "127.0.0.1:8080", "")
@@ -92,7 +92,7 @@ func httpProxyCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&configFile, "config", "", "", "")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		config := tunnel.HttpProxyConfig{}
+		config := tunnel.ProxyConfig{}
 
 		if configFile == "" {
 			config.Rules = []tunnel.Rule{rule}
@@ -106,7 +106,7 @@ func httpProxyCommand() *cobra.Command {
 			}
 		}
 
-		return tunnel.StartHttpProxy(cmd.Context(), addr, config)
+		return tunnel.StartProxy(cmd.Context(), addr, config)
 	}
 
 	return cmd

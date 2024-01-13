@@ -14,16 +14,19 @@ import (
 	"time"
 )
 
+const (
+	DefaultTimeout          = 5 * time.Second
+	DefaultServerPort       = 7654
+	AuthorizationHeaderName = "Authorization"
+	UpstreamHeaderName      = "X-Cloud-Tunnel-Upstream"
+)
+
 type Dialer interface {
-	Dial(network, addr string) (io.ReadWriteCloser, error)
+	DialContext(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
-type DefaultDialer struct {
-	timeout time.Duration
-}
-
-func (d *DefaultDialer) Dial(network, addr string) (io.ReadWriteCloser, error) {
-	return net.DialTimeout(network, addr, d.timeout)
+func NewDefaultDialer(timeout time.Duration) Dialer {
+	return &net.Dialer{Timeout: timeout}
 }
 
 type RemoteDialer struct {
@@ -32,15 +35,8 @@ type RemoteDialer struct {
 	clt *http.Client
 }
 
-func (r *RemoteDialer) Dial(_, addr string) (io.ReadWriteCloser, error) {
-	return connect(r.clt, r.ts, r.url, addr)
-}
-
-func NewDefaultDialer(timeout time.Duration) Dialer {
-	if timeout == 0 {
-		timeout = DefaultTimeout
-	}
-	return &DefaultDialer{timeout}
+func (r *RemoteDialer) DialContext(ctx context.Context, _, addr string) (net.Conn, error) {
+	return connect(ctx, r.clt, r.ts, r.url, addr)
 }
 
 func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, project, zone string) Dialer {
@@ -48,7 +44,7 @@ func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, projec
 		port = DefaultServerPort
 	}
 
-	u, _ := url.Parse("http://localhost")
+	u, _ := url.Parse("http://unused")
 
 	opts := iap.DialOptions{
 		Project:  project,
@@ -108,14 +104,14 @@ func (s *idTokenFromDefaultTokenSource) Token() (*oauth2.Token, error) {
 	}, nil
 }
 
-func connect(clt *http.Client, ts oauth2.TokenSource, url *url.URL, upstream string) (io.ReadWriteCloser, error) {
+func connect(ctx context.Context, clt *http.Client, ts oauth2.TokenSource, url *url.URL, upstream string) (net.Conn, error) {
 	req := &http.Request{
 		Method: "GET",
 		URL:    url,
 		Header: http.Header{
 			"Upgrade":          []string{"websocket"},
 			"Connection":       []string{"upgrade"},
-			upstreamHeaderName: []string{upstream},
+			UpstreamHeaderName: []string{upstream},
 		},
 	}
 
@@ -124,10 +120,10 @@ func connect(clt *http.Client, ts oauth2.TokenSource, url *url.URL, upstream str
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set(authorizationHeaderName, "Bearer "+token.AccessToken)
+		req.Header.Set(AuthorizationHeaderName, "Bearer "+token.AccessToken)
 	}
 
-	resp, err := clt.Do(req)
+	resp, err := clt.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -136,5 +132,5 @@ func connect(clt *http.Client, ts oauth2.TokenSource, url *url.URL, upstream str
 		return nil, fmt.Errorf("invalid response: %s", resp.Status)
 	}
 
-	return resp.Body.(io.ReadWriteCloser), nil
+	return rwcConn{rwc: resp.Body.(io.ReadWriteCloser), addr: upstream}, nil
 }
