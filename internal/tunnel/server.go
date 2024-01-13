@@ -4,17 +4,50 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/yamux"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"time"
 )
 
 func StartServer(addr string, timeout time.Duration, allowedUpstreams []string) error {
-	slog.Info(fmt.Sprintf("Listening on %s", addr))
+	if os.Getenv("K_SERVICE") != "" {
+		slog.Info(fmt.Sprintf("Listening on %s in standard mode", addr))
+		tunnel := newTunnelServer(timeout, allowedUpstreams)
+		return tunnel.listenAndServe(addr)
+	}
+
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	slog.Info(fmt.Sprintf("Listening on %s in mux mode", addr))
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			return err
+		}
+
+		go handleConnection(conn, timeout, allowedUpstreams)
+	}
+}
+
+func handleConnection(conn net.Conn, timeout time.Duration, allowedUpstreams []string) {
+	defer conn.Close()
+
+	server, err := yamux.Server(conn, nil)
+	if err != nil {
+		return
+	}
+	defer server.Close()
+
 	tunnel := newTunnelServer(timeout, allowedUpstreams)
-	return tunnel.listenAndServe(addr)
+	_ = tunnel.serve(server)
 }
 
 func newTunnelServer(timeout time.Duration, allowedUpstreams []string) *tunnelServer {
@@ -37,8 +70,11 @@ type tunnelServer struct {
 }
 
 func (s *tunnelServer) listenAndServe(addr string) error {
-	server := &http.Server{Addr: addr, Handler: s}
-	return server.ListenAndServe()
+	return http.ListenAndServe(addr, s)
+}
+
+func (s *tunnelServer) serve(ln net.Listener) error {
+	return http.Serve(ln, s)
 }
 
 func (s *tunnelServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
