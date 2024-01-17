@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/hashicorp/yamux v0.1.1
+	github.com/soheilhy/cmux v0.1.5
 	github.com/spf13/cobra v1.8.0
 	golang.org/x/oauth2 v0.16.0
 	golang.org/x/sync v0.6.0
