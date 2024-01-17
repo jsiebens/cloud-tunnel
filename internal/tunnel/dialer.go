@@ -3,45 +3,31 @@ package tunnel
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/yamux"
 	"github.com/jsiebens/cloud-tunnel/internal/iap"
+	"github.com/jsiebens/cloud-tunnel/internal/remotedialer"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/idtoken"
-	"io"
 	"net"
-	"net/http"
 	"net/url"
-	"sync"
 	"time"
 )
 
 const (
-	DefaultTimeout          = 5 * time.Second
-	DefaultServerPort       = 7654
-	AuthorizationHeaderName = "Authorization"
-	UpstreamHeaderName      = "X-Cloud-Tunnel-Upstream"
+	DefaultTimeout    = 5 * time.Second
+	DefaultServerPort = 7654
 )
 
-type Dialer interface {
-	DialContext(ctx context.Context, network, addr string) (net.Conn, error)
+func NewDefaultRemoteDialer(mux bool, ts oauth2.TokenSource, url *url.URL) remotedialer.Dialer {
+	dialer := remotedialer.Dialer(&net.Dialer{})
+	if mux {
+		dialer = remotedialer.Muxed(dialer)
+	}
+
+	return remotedialer.RemoteDialer(url, ts, dialer)
 }
 
-func NewDefaultDialer(timeout time.Duration) Dialer {
-	return &net.Dialer{Timeout: timeout}
-}
-
-type RemoteDialer struct {
-	url *url.URL
-	ts  oauth2.TokenSource
-	clt *http.Client
-}
-
-func (r *RemoteDialer) DialContext(ctx context.Context, _, addr string) (net.Conn, error) {
-	return connect(ctx, r.clt, r.ts, r.url, addr)
-}
-
-func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, project, zone string) Dialer {
+func NewIAPRemoteDialer(mux bool, ts oauth2.TokenSource, instance string, port int, project, zone string) remotedialer.Dialer {
 	if port == 0 {
 		port = DefaultServerPort
 	}
@@ -55,63 +41,12 @@ func NewIAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, projec
 		Port:     port,
 	}
 
-	c := func(ctx context.Context) (io.ReadWriteCloser, error) {
-		return iap.Dial(ctx, ts, opts)
+	dialer := remotedialer.IAPDialer(ts, opts)
+	if mux {
+		dialer = remotedialer.Muxed(dialer)
 	}
 
-	ms := &muxedSession{connect: c}
-
-	clt := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				session, err := ms.getSession(ctx)
-				if err != nil {
-					return nil, err
-				}
-				return session.Open()
-			},
-		},
-	}
-
-	return &RemoteDialer{u, ts, clt}
-}
-
-func NewCloudRunRemoteDialer(ts oauth2.TokenSource, url *url.URL) Dialer {
-	return &RemoteDialer{url, ts, http.DefaultClient}
-}
-
-type muxedSession struct {
-	sync.RWMutex
-
-	connect func(context.Context) (io.ReadWriteCloser, error)
-	session *yamux.Session
-}
-
-func (m *muxedSession) getSession(ctx context.Context) (*yamux.Session, error) {
-	m.RLock()
-	if m.session != nil && !m.session.IsClosed() {
-		m.RUnlock()
-		return m.session, nil
-	}
-	m.RUnlock()
-
-	m.Lock()
-	defer m.Unlock()
-
-	if m.session != nil && !m.session.IsClosed() {
-		return m.session, nil
-	}
-
-	conn, err := m.connect(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if m.session, err = yamux.Client(conn, nil); err != nil {
-		return nil, err
-	}
-
-	return m.session, nil
+	return remotedialer.RemoteDialer(u, ts, dialer)
 }
 
 func findTokenSource(ctx context.Context, audience string) (oauth2.TokenSource, error) {
@@ -148,35 +83,4 @@ func (s *idTokenFromDefaultTokenSource) Token() (*oauth2.Token, error) {
 		AccessToken: idToken,
 		Expiry:      token.Expiry,
 	}, nil
-}
-
-func connect(ctx context.Context, clt *http.Client, ts oauth2.TokenSource, url *url.URL, upstream string) (net.Conn, error) {
-	req := &http.Request{
-		Method: "GET",
-		URL:    url,
-		Header: http.Header{
-			"Upgrade":          []string{"websocket"},
-			"Connection":       []string{"upgrade"},
-			UpstreamHeaderName: []string{upstream},
-		},
-	}
-
-	if ts != nil {
-		token, err := ts.Token()
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set(AuthorizationHeaderName, "Bearer "+token.AccessToken)
-	}
-
-	resp, err := clt.Do(req.WithContext(ctx))
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusSwitchingProtocols {
-		return nil, fmt.Errorf("invalid response: %s", resp.Status)
-	}
-
-	return rwcConn{rwc: resp.Body.(io.ReadWriteCloser), addr: upstream}, nil
 }

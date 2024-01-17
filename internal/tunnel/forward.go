@@ -3,6 +3,7 @@ package tunnel
 import (
 	"context"
 	"fmt"
+	"github.com/jsiebens/cloud-tunnel/internal/remotedialer"
 	"golang.org/x/oauth2/google"
 	"log/slog"
 	"net"
@@ -16,6 +17,7 @@ type TcpForwardConfig struct {
 	Project    string
 	Zone       string
 	Upstream   string
+	MuxEnabled bool
 }
 
 func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error {
@@ -34,7 +36,7 @@ func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error
 		p := tcpForward{
 			addr:     addr,
 			upstream: c.Upstream,
-			dialer:   NewCloudRunRemoteDialer(ts, u),
+			dialer:   NewDefaultRemoteDialer(c.MuxEnabled, ts, u),
 		}
 
 		return p.start()
@@ -50,7 +52,7 @@ func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error
 		p := tcpForward{
 			addr:     addr,
 			upstream: c.Upstream,
-			dialer:   NewIAPRemoteDialer(ts, c.Instance, c.Port, c.Project, c.Zone),
+			dialer:   NewIAPRemoteDialer(c.MuxEnabled, ts, c.Instance, c.Port, c.Project, c.Zone),
 		}
 
 		return p.start()
@@ -60,7 +62,7 @@ func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error
 type tcpForward struct {
 	addr     string
 	upstream string
-	dialer   Dialer
+	dialer   remotedialer.Dialer
 }
 
 func (tp *tcpForward) start() error {

@@ -3,6 +3,7 @@ package tunnel
 import (
 	"context"
 	"fmt"
+	"github.com/jsiebens/cloud-tunnel/internal/remotedialer"
 	"log/slog"
 	"net"
 	"net/http"
@@ -11,7 +12,7 @@ import (
 )
 
 type httpProxy struct {
-	dialer  Dialer
+	dialer  remotedialer.Dialer
 	targets proxyUpstreams
 }
 
