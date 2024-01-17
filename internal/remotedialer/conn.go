@@ -1,4 +1,4 @@
-package tunnel
+package remotedialer
 
 import (
 	"io"

@@ -2,13 +2,14 @@ package tunnel
 
 import (
 	"context"
+	"github.com/jsiebens/cloud-tunnel/internal/remotedialer"
 	"log/slog"
 	"net"
 	"tailscale.com/net/socks5"
 )
 
 type socks5Proxy struct {
-	dialer  Dialer
+	dialer  remotedialer.Dialer
 	targets proxyUpstreams
 }
 

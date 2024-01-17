@@ -3,6 +3,7 @@ package tunnel
 import (
 	"context"
 	"fmt"
+	"github.com/jsiebens/cloud-tunnel/internal/remotedialer"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/sync/errgroup"
 	"log/slog"
@@ -21,12 +22,12 @@ func StartProxy(ctx context.Context, addr string, c ProxyConfig) error {
 
 	p := &httpProxy{
 		targets: targets,
-		dialer:  NewDefaultDialer(c.Timeout),
+		dialer:  &net.Dialer{Timeout: c.Timeout},
 	}
 
 	s := &socks5Proxy{
 		targets: targets,
-		dialer:  NewDefaultDialer(c.Timeout),
+		dialer:  &net.Dialer{Timeout: c.Timeout},
 	}
 
 	ln, err := net.Listen("tcp", addr)
@@ -61,6 +62,7 @@ type Tunnel struct {
 	Project    string `yaml:"project"`
 	Zone       string `yaml:"zone"`
 	ServiceUrl string `yaml:"service_url"`
+	MuxEnabled bool   `yaml:"mux"`
 }
 
 func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream, error) {
@@ -79,7 +81,7 @@ func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream,
 				return nil, err
 			}
 
-			dialer := NewCloudRunRemoteDialer(ts, u)
+			dialer := NewDefaultRemoteDialer(t.MuxEnabled, ts, u)
 
 			if len(rule.Upstreams) == 0 {
 				targets = append(targets, newProxyUpstream("*", dialer))
@@ -97,7 +99,7 @@ func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream,
 				return nil, err
 			}
 
-			dialer := NewIAPRemoteDialer(ts, t.Instance, t.Port, t.Project, t.Zone)
+			dialer := NewIAPRemoteDialer(t.MuxEnabled, ts, t.Instance, t.Port, t.Project, t.Zone)
 
 			if len(rule.Upstreams) == 0 {
 				targets = append(targets, newProxyUpstream("*", dialer))
@@ -113,7 +115,7 @@ func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream,
 	return targets, nil
 }
 
-func newProxyUpstream(upstream string, dialer Dialer) proxyUpstream {
+func newProxyUpstream(upstream string, dialer remotedialer.Dialer) proxyUpstream {
 	pt := proxyUpstream{
 		upstream: upstream,
 		dialer:   dialer,
@@ -129,7 +131,7 @@ func newProxyUpstream(upstream string, dialer Dialer) proxyUpstream {
 type proxyUpstream struct {
 	upstream string
 	prefix   *netip.Prefix
-	dialer   Dialer
+	dialer   remotedialer.Dialer
 }
 
 func (u proxyUpstream) matches(candidate string) bool {
@@ -161,7 +163,7 @@ func (u proxyUpstream) matches(candidate string) bool {
 
 type proxyUpstreams []proxyUpstream
 
-func (p proxyUpstreams) getDialer(target string, local Dialer) (string, Dialer) {
+func (p proxyUpstreams) getDialer(target string, local remotedialer.Dialer) (string, remotedialer.Dialer) {
 	for _, u := range p {
 		if u.matches(target) {
 			return "remote", u.dialer

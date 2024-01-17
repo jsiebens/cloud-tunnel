@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/yamux"
+	"github.com/jsiebens/cloud-tunnel/internal/remotedialer"
 	"github.com/soheilhy/cmux"
 	"io"
 	"log/slog"
@@ -42,7 +43,7 @@ func StartServer(addr string, timeout time.Duration, allowedUpstreams []string) 
 }
 
 func newTunnelServer(timeout time.Duration, allowedUpstreams []string) *tunnelServer {
-	dialer := NewDefaultDialer(timeout)
+	dialer := &net.Dialer{Timeout: timeout}
 
 	if len(allowedUpstreams) == 0 {
 		return &tunnelServer{allowedUpstreams: []proxyUpstream{newProxyUpstream("*", dialer)}}
@@ -89,7 +90,7 @@ func (s *tunnelServer) serveMux(ln net.Listener) error {
 }
 
 func (s *tunnelServer) upgrade(w http.ResponseWriter, req *http.Request) {
-	target := req.Header.Get(UpstreamHeaderName)
+	target := req.Header.Get(remotedialer.UpstreamHeaderName)
 	if len(target) == 0 {
 		http.Error(w, "missing target header", http.StatusBadRequest)
 		return
@@ -142,7 +143,7 @@ func (s *tunnelServer) hijackConnection(w http.ResponseWriter, r *http.Request) 
 	return conn, nil
 }
 
-func (s *tunnelServer) handleConnection(conn net.Conn, target string, dialer Dialer) {
+func (s *tunnelServer) handleConnection(conn net.Conn, target string, dialer remotedialer.Dialer) {
 	defer conn.Close()
 	dst, err := dialer.DialContext(context.Background(), "tcp", target)
 	if err != nil {
@@ -154,7 +155,7 @@ func (s *tunnelServer) handleConnection(conn net.Conn, target string, dialer Dia
 	pipe(conn, dst)
 }
 
-func (s *tunnelServer) getDialer(target string) Dialer {
+func (s *tunnelServer) getDialer(target string) remotedialer.Dialer {
 	for _, u := range s.allowedUpstreams {
 		if u.matches(target) {
 			return u.dialer

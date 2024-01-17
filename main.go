@@ -51,7 +51,6 @@ func tcpForwardCommand() *cobra.Command {
 	}
 
 	var addr string
-	var timeout time.Duration
 	var c = tunnel.TcpForwardConfig{}
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", "127.0.0.1:8080", "")
@@ -61,7 +60,7 @@ func tcpForwardCommand() *cobra.Command {
 	cmd.Flags().IntVarP(&c.Port, "port", "", tunnel.DefaultServerPort, "")
 	cmd.Flags().StringVarP(&c.Project, "project", "", "", "")
 	cmd.Flags().StringVarP(&c.Zone, "zone", "", "", "")
-	cmd.Flags().DurationVarP(&timeout, "dial-timeout", "", tunnel.DefaultTimeout, "")
+	cmd.Flags().BoolVarP(&c.MuxEnabled, "mux", "", false, "")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		return tunnel.StartTcpForward(cmd.Context(), addr, c)
@@ -88,6 +87,7 @@ func proxyCommand() *cobra.Command {
 	cmd.Flags().IntVarP(&rule.Tunnel.Port, "port", "", tunnel.DefaultServerPort, "")
 	cmd.Flags().StringVarP(&rule.Tunnel.Project, "project", "", "", "")
 	cmd.Flags().StringVarP(&rule.Tunnel.Zone, "zone", "", "", "")
+	cmd.Flags().BoolVarP(&rule.Tunnel.MuxEnabled, "mux", "", false, "")
 	cmd.Flags().StringSliceVarP(&rule.Upstreams, "upstream", "", []string{}, "")
 	cmd.Flags().StringVarP(&configFile, "config", "", "", "")
 
