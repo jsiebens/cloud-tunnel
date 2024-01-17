@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/yamux"
+	"github.com/soheilhy/cmux"
 	"io"
 	"log/slog"
 	"net"
@@ -14,40 +15,30 @@ import (
 )
 
 func StartServer(addr string, timeout time.Duration, allowedUpstreams []string) error {
-	if os.Getenv("K_SERVICE") != "" {
-		slog.Info(fmt.Sprintf("Listening on %s in standard mode", addr))
-		tunnel := newTunnelServer(timeout, allowedUpstreams)
-		return tunnel.listenAndServe(addr)
-	}
+	server := newTunnelServer(timeout, allowedUpstreams)
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 
+	// if running on Cloud Run, no need to run in muxed mode
+	// see: https://cloud.google.com/run/docs/container-contract#env-vars
+	if os.Getenv("K_SERVICE") != "" {
+		slog.Info(fmt.Sprintf("Listening on %s in standard mode", addr))
+		return server.serveHttp(listener)
+	}
+
 	slog.Info(fmt.Sprintf("Listening on %s in mux mode", addr))
 
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			return err
-		}
+	m := cmux.New(listener)
+	httpL := m.Match(cmux.HTTP1Fast(), cmux.HTTP2())
+	muxL := m.Match(cmux.Any())
 
-		go handleConnection(conn, timeout, allowedUpstreams)
-	}
-}
+	go server.serveHttp(httpL)
+	go server.serveMux(muxL)
 
-func handleConnection(conn net.Conn, timeout time.Duration, allowedUpstreams []string) {
-	defer conn.Close()
-
-	server, err := yamux.Server(conn, nil)
-	if err != nil {
-		return
-	}
-	defer server.Close()
-
-	tunnel := newTunnelServer(timeout, allowedUpstreams)
-	_ = tunnel.serve(server)
+	return m.Serve()
 }
 
 func newTunnelServer(timeout time.Duration, allowedUpstreams []string) *tunnelServer {
@@ -69,15 +60,35 @@ type tunnelServer struct {
 	allowedUpstreams []proxyUpstream
 }
 
-func (s *tunnelServer) listenAndServe(addr string) error {
-	return http.ListenAndServe(addr, s)
+func (s *tunnelServer) serveHttp(ln net.Listener) error {
+	return http.Serve(ln, http.HandlerFunc(s.upgrade))
 }
 
-func (s *tunnelServer) serve(ln net.Listener) error {
-	return http.Serve(ln, s)
+func (s *tunnelServer) serveMux(ln net.Listener) error {
+	hc := func(conn net.Conn) {
+		defer conn.Close()
+
+		server, err := yamux.Server(conn, nil)
+		if err != nil {
+			return
+		}
+		defer server.Close()
+
+		tunnel := tunnelServer{allowedUpstreams: s.allowedUpstreams}
+		_ = tunnel.serveHttp(server)
+	}
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return err
+		}
+
+		go hc(conn)
+	}
 }
 
-func (s *tunnelServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (s *tunnelServer) upgrade(w http.ResponseWriter, req *http.Request) {
 	target := req.Header.Get(UpstreamHeaderName)
 	if len(target) == 0 {
 		http.Error(w, "missing target header", http.StatusBadRequest)
