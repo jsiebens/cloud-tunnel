@@ -3,7 +3,7 @@ package tunnel
 import (
 	"context"
 	"fmt"
-	"github.com/jsiebens/cloud-tunnel/internal/remotedialer"
+	"github.com/jsiebens/cloud-tunnel/pkg/remotedialer"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/sync/errgroup"
 	"log/slog"

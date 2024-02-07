@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/yamux"
-	"github.com/jsiebens/cloud-tunnel/internal/remotedialer"
+	"github.com/jsiebens/cloud-tunnel/pkg/remotedialer"
 	"github.com/soheilhy/cmux"
 	"io"
 	"log/slog"

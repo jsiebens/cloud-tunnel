@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/jsiebens/cloud-tunnel/internal/tunnel"
-	"github.com/jsiebens/cloud-tunnel/internal/version"
+	"github.com/jsiebens/cloud-tunnel/pkg/tunnel"
+	"github.com/jsiebens/cloud-tunnel/pkg/version"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	"os"

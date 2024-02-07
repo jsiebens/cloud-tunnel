@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/yamux"
-	"github.com/jsiebens/cloud-tunnel/internal/iap"
+	"github.com/jsiebens/cloud-tunnel/pkg/iap"
 	"golang.org/x/oauth2"
 	"io"
 	"net"

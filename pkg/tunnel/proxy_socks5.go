@@ -2,7 +2,7 @@ package tunnel
 
 import (
 	"context"
-	"github.com/jsiebens/cloud-tunnel/internal/remotedialer"
+	"github.com/jsiebens/cloud-tunnel/pkg/remotedialer"
 	"log/slog"
 	"net"
 	"tailscale.com/net/socks5"
