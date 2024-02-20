@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func StartProxy(ctx context.Context, addr string, c ProxyConfig) error {
+func ServeProxy(ctx context.Context, ln net.Listener, c ProxyConfig) error {
 	targets, err := c.createProxyUpstreams(ctx)
 	if err != nil {
 		return err
@@ -30,13 +30,6 @@ func StartProxy(ctx context.Context, addr string, c ProxyConfig) error {
 		dialer:  &net.Dialer{Timeout: c.Timeout},
 	}
 
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-
-	slog.Info(fmt.Sprintf("Listening on %s", addr))
-
 	socksListener, httpListener := proxymux.SplitSOCKSAndHTTP(ln)
 
 	g := new(errgroup.Group)
@@ -44,6 +37,17 @@ func StartProxy(ctx context.Context, addr string, c ProxyConfig) error {
 	g.Go(func() error { return p.serve(httpListener) })
 
 	return g.Wait()
+}
+
+func StartProxy(ctx context.Context, addr string, c ProxyConfig) error {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	slog.Info(fmt.Sprintf("Listening on %s", addr))
+
+	return ServeProxy(ctx, ln, c)
 }
 
 type ProxyConfig struct {
