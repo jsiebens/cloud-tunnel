@@ -56,6 +56,7 @@ func tcpForwardCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", "127.0.0.1:8080", "")
 	cmd.Flags().StringVarP(&c.Upstream, "upstream", "", "", "")
 	cmd.Flags().StringVarP(&c.ServiceUrl, "service-url", "", "", "")
+	cmd.Flags().StringVarP(&c.ServiceAccount, "service-account", "", "", "")
 	cmd.Flags().StringVarP(&c.Instance, "instance", "", "", "")
 	cmd.Flags().IntVarP(&c.Port, "port", "", proxy.DefaultServerPort, "")
 	cmd.Flags().StringVarP(&c.Project, "project", "", "", "")
@@ -83,6 +84,7 @@ func proxyCommand() *cobra.Command {
 
 	cmd.Flags().StringVarP(&addr, "listen-addr", "", "127.0.0.1:8080", "")
 	cmd.Flags().StringVarP(&rule.Tunnel.ServiceUrl, "service-url", "", "", "")
+	cmd.Flags().StringVarP(&rule.Tunnel.ServiceAccount, "service-account", "", "", "")
 	cmd.Flags().StringVarP(&rule.Tunnel.Instance, "instance", "", "", "")
 	cmd.Flags().IntVarP(&rule.Tunnel.Port, "port", "", proxy.DefaultServerPort, "")
 	cmd.Flags().StringVarP(&rule.Tunnel.Project, "project", "", "", "")

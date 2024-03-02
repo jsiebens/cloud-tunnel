@@ -4,20 +4,20 @@ import (
 	"context"
 	"fmt"
 	"github.com/jsiebens/cloud-tunnel/pkg/remotedialer"
-	"golang.org/x/oauth2/google"
 	"log/slog"
 	"net"
 	"net/url"
 )
 
 type TcpForwardConfig struct {
-	ServiceUrl string
-	Instance   string
-	Port       int
-	Project    string
-	Zone       string
-	Upstream   string
-	MuxEnabled bool
+	ServiceUrl     string
+	ServiceAccount string
+	Instance       string
+	Port           int
+	Project        string
+	Zone           string
+	Upstream       string
+	MuxEnabled     bool
 }
 
 func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error {
@@ -28,7 +28,7 @@ func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error
 			return err
 		}
 
-		ts, err := findTokenSource(ctx, c.ServiceUrl)
+		ts, err := idTokenSource(ctx, c.ServiceUrl, c.ServiceAccount)
 		if err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error
 
 	// iap
 	{
-		ts, err := google.DefaultTokenSource(ctx)
+		ts, err := tokenSource(ctx, c.ServiceAccount)
 		if err != nil {
 			return err
 		}

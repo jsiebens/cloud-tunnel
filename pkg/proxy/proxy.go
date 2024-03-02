@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/jsiebens/cloud-tunnel/pkg/remotedialer"
-	"golang.org/x/oauth2/google"
 	"golang.org/x/sync/errgroup"
 	"log/slog"
 	"net"
@@ -61,12 +60,13 @@ type Rule struct {
 }
 
 type Tunnel struct {
-	Instance   string `yaml:"instance"`
-	Port       int    `yaml:"port"`
-	Project    string `yaml:"project"`
-	Zone       string `yaml:"zone"`
-	ServiceUrl string `yaml:"service_url"`
-	MuxEnabled bool   `yaml:"mux"`
+	Instance       string `yaml:"instance"`
+	Port           int    `yaml:"port"`
+	Project        string `yaml:"project"`
+	Zone           string `yaml:"zone"`
+	ServiceUrl     string `yaml:"service_url"`
+	ServiceAccount string `yaml:"service_account"`
+	MuxEnabled     bool   `yaml:"mux"`
 }
 
 func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream, error) {
@@ -80,7 +80,7 @@ func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream,
 				return nil, err
 			}
 
-			ts, err := findTokenSource(ctx, t.ServiceUrl)
+			ts, err := idTokenSource(ctx, t.ServiceUrl, t.ServiceAccount)
 			if err != nil {
 				return nil, err
 			}
@@ -98,7 +98,7 @@ func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream,
 		}
 
 		if t.Instance != "" {
-			ts, err := google.DefaultTokenSource(ctx)
+			ts, err := tokenSource(ctx, t.ServiceAccount)
 			if err != nil {
 				return nil, err
 			}
