@@ -1,4 +1,4 @@
-package tunnel
+package proxy
 
 import (
 	"context"
@@ -18,7 +18,7 @@ const (
 	DefaultServerPort = 7654
 )
 
-func NewDefaultRemoteDialer(mux bool, ts oauth2.TokenSource, url *url.URL) remotedialer.Dialer {
+func defaultRemoteDialer(mux bool, ts oauth2.TokenSource, url *url.URL) remotedialer.Dialer {
 	dialer := remotedialer.Dialer(&net.Dialer{})
 	if mux {
 		dialer = remotedialer.Muxed(dialer)
@@ -27,7 +27,7 @@ func NewDefaultRemoteDialer(mux bool, ts oauth2.TokenSource, url *url.URL) remot
 	return remotedialer.RemoteDialer(url, ts, dialer)
 }
 
-func NewIAPRemoteDialer(mux bool, ts oauth2.TokenSource, instance string, port int, project, zone string) remotedialer.Dialer {
+func iapRemoteDialer(mux bool, ts oauth2.TokenSource, instance string, port int, project, zone string) remotedialer.Dialer {
 	if port == 0 {
 		port = DefaultServerPort
 	}

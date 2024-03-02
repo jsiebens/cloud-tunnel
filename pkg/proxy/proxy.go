@@ -1,4 +1,4 @@
-package tunnel
+package proxy
 
 import (
 	"context"
@@ -85,7 +85,7 @@ func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream,
 				return nil, err
 			}
 
-			dialer := NewDefaultRemoteDialer(t.MuxEnabled, ts, u)
+			dialer := defaultRemoteDialer(t.MuxEnabled, ts, u)
 
 			if len(rule.Upstreams) == 0 {
 				targets = append(targets, newProxyUpstream("*", dialer))
@@ -103,7 +103,7 @@ func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream,
 				return nil, err
 			}
 
-			dialer := NewIAPRemoteDialer(t.MuxEnabled, ts, t.Instance, t.Port, t.Project, t.Zone)
+			dialer := iapRemoteDialer(t.MuxEnabled, ts, t.Instance, t.Port, t.Project, t.Zone)
 
 			if len(rule.Upstreams) == 0 {
 				targets = append(targets, newProxyUpstream("*", dialer))

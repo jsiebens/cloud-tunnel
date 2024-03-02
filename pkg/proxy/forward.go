@@ -1,4 +1,4 @@
-package tunnel
+package proxy
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error
 		p := tcpForward{
 			addr:     addr,
 			upstream: c.Upstream,
-			dialer:   NewDefaultRemoteDialer(c.MuxEnabled, ts, u),
+			dialer:   defaultRemoteDialer(c.MuxEnabled, ts, u),
 		}
 
 		return p.start()
@@ -52,7 +52,7 @@ func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error
 		p := tcpForward{
 			addr:     addr,
 			upstream: c.Upstream,
-			dialer:   NewIAPRemoteDialer(c.MuxEnabled, ts, c.Instance, c.Port, c.Project, c.Zone),
+			dialer:   iapRemoteDialer(c.MuxEnabled, ts, c.Instance, c.Port, c.Project, c.Zone),
 		}
 
 		return p.start()
