@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"strings"
 	"tailscale.com/net/proxymux"
 	"time"
 )
@@ -143,6 +144,12 @@ func (u proxyUpstream) matches(candidate string) bool {
 		return true
 	}
 
+	if suffix := strings.TrimPrefix(u.upstream, "*"); strings.HasPrefix(u.upstream, "*") {
+		if strings.HasSuffix(candidate, suffix) {
+			return true
+		}
+	}
+
 	if candidate == u.upstream {
 		return true
 	}
@@ -150,6 +157,12 @@ func (u proxyUpstream) matches(candidate string) bool {
 	host, _, err := net.SplitHostPort(candidate)
 	if err != nil {
 		return false
+	}
+
+	if suffix := strings.TrimPrefix(u.upstream, "*"); strings.HasPrefix(u.upstream, "*") {
+		if strings.HasSuffix(host, suffix) {
+			return true
+		}
 	}
 
 	if host == u.upstream {
