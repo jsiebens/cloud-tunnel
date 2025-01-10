@@ -3,53 +3,15 @@ package proxy
 import (
 	"context"
 	"fmt"
-	"github.com/jsiebens/cloud-tunnel/pkg/iap"
-	"github.com/jsiebens/cloud-tunnel/pkg/remotedialer"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/idtoken"
 	"google.golang.org/api/impersonate"
-	"net"
-	"net/url"
-	"time"
 )
 
 const (
-	DefaultTimeout     = 5 * time.Second
-	DefaultServerPort  = 7654
 	cloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform"
 )
-
-func defaultRemoteDialer(mux bool, ts oauth2.TokenSource, url *url.URL) remotedialer.Dialer {
-	dialer := remotedialer.Dialer(&net.Dialer{})
-	if mux {
-		dialer = remotedialer.Muxed(dialer)
-	}
-
-	return remotedialer.RemoteDialer(url, ts, dialer)
-}
-
-func iapRemoteDialer(mux bool, ts oauth2.TokenSource, instance string, port int, project, zone string) remotedialer.Dialer {
-	if port == 0 {
-		port = DefaultServerPort
-	}
-
-	u, _ := url.Parse("http://unused")
-
-	opts := iap.DialOptions{
-		Project:  project,
-		Zone:     zone,
-		Instance: instance,
-		Port:     port,
-	}
-
-	dialer := remotedialer.IAPDialer(ts, opts)
-	if mux {
-		dialer = remotedialer.Muxed(dialer)
-	}
-
-	return remotedialer.RemoteDialer(u, ts, dialer)
-}
 
 func tokenSource(ctx context.Context, serviceAccount string) (oauth2.TokenSource, error) {
 	if serviceAccount != "" {

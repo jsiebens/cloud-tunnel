@@ -86,7 +86,7 @@ func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream,
 				return nil, err
 			}
 
-			dialer := defaultRemoteDialer(t.MuxEnabled, ts, u)
+			dialer := remotedialer.RemoteDialer(ts, u, t.MuxEnabled)
 
 			if len(rule.Upstreams) == 0 {
 				targets = append(targets, newProxyUpstream("*", dialer))
@@ -104,7 +104,7 @@ func (c ProxyConfig) createProxyUpstreams(ctx context.Context) ([]proxyUpstream,
 				return nil, err
 			}
 
-			dialer := iapRemoteDialer(t.MuxEnabled, ts, t.Instance, t.Port, t.Project, t.Zone)
+			dialer := remotedialer.IAPRemoteDialer(ts, t.Instance, t.Port, t.Project, t.Zone, t.MuxEnabled)
 
 			if len(rule.Upstreams) == 0 {
 				targets = append(targets, newProxyUpstream("*", dialer))

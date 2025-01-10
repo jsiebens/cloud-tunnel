@@ -16,13 +16,41 @@ import (
 const (
 	AuthorizationHeaderName = "Authorization"
 	UpstreamHeaderName      = "X-Cloud-Tunnel-Upstream"
+	DefaultServerPort       = 7654
 )
 
 type Dialer interface {
 	DialContext(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
-func RemoteDialer(u *url.URL, ts oauth2.TokenSource, dialer Dialer) Dialer {
+func RemoteDialer(ts oauth2.TokenSource, url *url.URL, mux bool) Dialer {
+	dialer := Dialer(&net.Dialer{})
+	if mux {
+		dialer = muxed(dialer)
+	}
+
+	return &remoteDialer{url: url, ts: ts, dialer: dialer}
+}
+
+func IAPRemoteDialer(ts oauth2.TokenSource, instance string, port int, project, zone string, mux bool) Dialer {
+	if port == 0 {
+		port = DefaultServerPort
+	}
+
+	u, _ := url.Parse("http://unused")
+
+	opts := iap.DialOptions{
+		Project:  project,
+		Zone:     zone,
+		Instance: instance,
+		Port:     port,
+	}
+
+	dialer := Dialer(&iapDialer{ts, opts})
+	if mux {
+		dialer = muxed(dialer)
+	}
+
 	return &remoteDialer{url: u, ts: ts, dialer: dialer}
 }
 
@@ -73,10 +101,6 @@ func (r *remoteDialer) DialContext(ctx context.Context, network, addr string) (n
 	return rwcConn{rwc: resp.Body.(io.ReadWriteCloser), addr: addr}, nil
 }
 
-func IAPDialer(ts oauth2.TokenSource, opts iap.DialOptions) Dialer {
-	return &iapDialer{ts, opts}
-}
-
 type iapDialer struct {
 	ts   oauth2.TokenSource
 	opts iap.DialOptions
@@ -86,7 +110,7 @@ func (i *iapDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, err
 	return iap.Dial(ctx, i.ts, i.opts)
 }
 
-func Muxed(dialer Dialer) Dialer {
+func muxed(dialer Dialer) Dialer {
 	return &muxedDialer{dialer: dialer, sessions: make(map[string]*yamux.Session)}
 }
 

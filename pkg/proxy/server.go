@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+const DefaultTimeout = 5 * time.Second
+
 func StartServer(addr string, timeout time.Duration, allowedUpstreams []string) error {
 	server := newTunnelServer(timeout, allowedUpstreams)
 

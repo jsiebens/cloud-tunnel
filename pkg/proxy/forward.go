@@ -36,7 +36,7 @@ func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error
 		p := tcpForward{
 			addr:     addr,
 			upstream: c.Upstream,
-			dialer:   defaultRemoteDialer(c.MuxEnabled, ts, u),
+			dialer:   remotedialer.RemoteDialer(ts, u, c.MuxEnabled),
 		}
 
 		return p.start()
@@ -52,7 +52,7 @@ func StartTcpForward(ctx context.Context, addr string, c TcpForwardConfig) error
 		p := tcpForward{
 			addr:     addr,
 			upstream: c.Upstream,
-			dialer:   iapRemoteDialer(c.MuxEnabled, ts, c.Instance, c.Port, c.Project, c.Zone),
+			dialer:   remotedialer.IAPRemoteDialer(ts, c.Instance, c.Port, c.Project, c.Zone, c.MuxEnabled),
 		}
 
 		return p.start()

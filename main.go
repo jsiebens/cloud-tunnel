@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/jsiebens/cloud-tunnel/internal/version"
 	"github.com/jsiebens/cloud-tunnel/pkg/proxy"
+	"github.com/jsiebens/cloud-tunnel/pkg/remotedialer"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -58,7 +59,7 @@ func tcpForwardCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&c.ServiceUrl, "service-url", "", "", "")
 	cmd.Flags().StringVarP(&c.ServiceAccount, "service-account", "", "", "")
 	cmd.Flags().StringVarP(&c.Instance, "instance", "", "", "")
-	cmd.Flags().IntVarP(&c.Port, "port", "", proxy.DefaultServerPort, "")
+	cmd.Flags().IntVarP(&c.Port, "port", "", remotedialer.DefaultServerPort, "")
 	cmd.Flags().StringVarP(&c.Project, "project", "", "", "")
 	cmd.Flags().StringVarP(&c.Zone, "zone", "", "", "")
 	cmd.Flags().BoolVarP(&c.MuxEnabled, "mux", "", false, "")
@@ -86,7 +87,7 @@ func proxyCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&rule.Tunnel.ServiceUrl, "service-url", "", "", "")
 	cmd.Flags().StringVarP(&rule.Tunnel.ServiceAccount, "service-account", "", "", "")
 	cmd.Flags().StringVarP(&rule.Tunnel.Instance, "instance", "", "", "")
-	cmd.Flags().IntVarP(&rule.Tunnel.Port, "port", "", proxy.DefaultServerPort, "")
+	cmd.Flags().IntVarP(&rule.Tunnel.Port, "port", "", remotedialer.DefaultServerPort, "")
 	cmd.Flags().StringVarP(&rule.Tunnel.Project, "project", "", "", "")
 	cmd.Flags().StringVarP(&rule.Tunnel.Zone, "zone", "", "", "")
 	cmd.Flags().BoolVarP(&rule.Tunnel.MuxEnabled, "mux", "", false, "")
